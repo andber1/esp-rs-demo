@@ -1,6 +1,6 @@
 [package]
 name = "esp-rs-demo"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["andber1 <82754113+andber1@users.noreply.github.com>"]
 edition = "2021"
 resolver = "2"
@@ -16,8 +16,11 @@ opt-level = "z"
 pio = ["esp-idf-sys/pio"]
 
 [dependencies]
-esp-idf-sys = { version = "0.31.11", features = ["binstart"] }
+anyhow = "1.0"
+esp-idf-sys = { version = "0.32.1", features = ["binstart"] }
+esp-idf-hal = "0.40.1"
+rgb = "0.8.36"
 
 
 [build-dependencies]
-embuild = "0.30.4"
+embuild = "0.31.0"
