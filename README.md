@@ -2,6 +2,11 @@
 
 A simple STD binary for the development board [ESP32-C3-DevKit-RUST](https://github.com/esp-rs/esp-rust-board).
 
+**Features**
+- Control of RGB LED
+- Temperature and humidity measurement (via SHCT3 sensor)
+- Webserver that shows svg plots of temperature
+
 ## Getting Started
 
 ```
@@ -9,6 +14,8 @@ export ESP32_DEMO_WIFI_SSID=<ssid>
 export ESP32_DEMO_WIFI_PASS=<password>
 cargo espflash flash --release --baud 921600 --monitor 
 ```
+
+After flashing the ESP32 will provide a webserver that generates plots of the measured temperature.
 
 ## Prerequisites
 

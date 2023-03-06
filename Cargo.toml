@@ -1,12 +1,13 @@
 [package]
 name = "esp-rs-demo"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["andber1 <82754113+andber1@users.noreply.github.com>"]
 edition = "2021"
 resolver = "2"
 
 [profile.release]
 opt-level = "s"
+lto = true
 
 [profile.dev]
 debug = true # Symbols are nice and they don't increase the size on Flash
@@ -24,6 +25,8 @@ embedded-svc = {version = "0.24", features = ["experimental"]}
 embedded-hal = "0.2.7"
 rgb = "0.8.36"
 shtcx = "0.11.0"
+poloto = "17.1.0"
+ringbuffer = "0.12.0"
 
 
 [build-dependencies]

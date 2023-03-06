@@ -3,7 +3,8 @@
 mod led;
 mod wifi;
 
-use crate::led::LedDriver;
+use std::sync::{Arc, Mutex};
+
 use crate::wifi::connect_wifi;
 use embedded_svc::http::Method;
 use embedded_svc::io::Write;
@@ -14,10 +15,13 @@ use esp_idf_hal::{
     i2c::{config::Config, I2cDriver},
     units::KiloHertz,
 };
-use esp_idf_svc::http::server::EspHttpServer;
+use esp_idf_svc::http::server::{Configuration, EspHttpServer};
 use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 
 use esp_idf_hal::delay::FreeRtos;
+use led::LedDriver;
+use rgb::RGB8;
+use ringbuffer::{AllocRingBuffer, RingBufferExt, RingBufferWrite};
 
 fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -32,7 +36,7 @@ fn main() -> anyhow::Result<()> {
     // connect wo wifi
     let _wifi = connect_wifi(peripherals.modem)?;
 
-    // crete temperature sensor
+    // create temperature sensor
     let mut temperature_sensor = shtcx::shtc3(I2cDriver::new(
         peripherals.i2c0,
         peripherals.pins.gpio10,
@@ -40,29 +44,45 @@ fn main() -> anyhow::Result<()> {
         &Config::default().baudrate(KiloHertz::from(400).into()),
     )?);
 
-    // start one measurement
-    let measurement = temperature_sensor
-        .measure(shtcx::PowerMode::NormalMode, &mut FreeRtos)
-        .expect("SHTC3 measurement failure");
+    // create buffer for sensor data
+    let buffer = Arc::new(Mutex::new(AllocRingBuffer::with_capacity(512)));
+    let buffer2 = buffer.clone();
 
-    // start webserver
-    let mut server = EspHttpServer::new(&Default::default())?;
+    // start webserver to plot data
+    let server_config = Configuration {
+        stack_size: 16000,
+        ..Default::default()
+    };
+    let mut server = EspHttpServer::new(&server_config)?;
     server.fn_handler("/", Method::Get, move |req| {
-        req.into_ok_response()?.write_all(
-            format!(
-                "Temperature {} deg C<br>Humidity {} %",
-                measurement.temperature.as_degrees_celsius(),
-                measurement.humidity.as_percent()
-            )
-            .as_bytes(),
-        )?;
+        let data: Vec<_> = buffer2
+            .lock()
+            .unwrap()
+            .iter()
+            .enumerate()
+            .map(|(index, value)| [index as f64, *value as f64])
+            .collect();
+        let a = poloto::build::plot("temperature").line(data);
+        let plot = poloto::data(a)
+            .build_and_label(("Temperature", "x", "y"))
+            .append_to(poloto::header().light_theme())
+            .render_string()?;
+
+        req.into_ok_response()?.write_all(plot.as_bytes())?;
         std::result::Result::Ok(())
     })?;
 
-    let mut hue = 0_u8;
+    led.set_color(RGB8::new(0_u8, 1_u8, 0_u8))?;
     loop {
-        hue = hue.wrapping_add(40);
-        led.set_color(led::hue_to_color(hue))?;
-        std::thread::sleep(std::time::Duration::from_millis(1000));
+        // start one measurement
+        let measurement = temperature_sensor
+            .measure(shtcx::PowerMode::NormalMode, &mut FreeRtos)
+            .expect("SHTC3 measurement failure");
+        buffer
+            .lock()
+            .unwrap()
+            .push(measurement.temperature.as_degrees_celsius());
+
+        FreeRtos::delay_ms(2000);
     }
 }

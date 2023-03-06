@@ -14,9 +14,9 @@ impl<'a> LedDriver for TxRmtDriver<'a> {
 
         let ticks_hz = self.counter_clock()?;
         let t0h = Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(350))?;
-        let t0l = Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(800))?;
-        let t1h = Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(700))?;
-        let t1l = Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(600))?;
+        let t0l = Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(1000))?;
+        let t1h = Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(1000))?;
+        let t1l = Pulse::new_with_duration(ticks_hz, PinState::Low, &Duration::from_nanos(350))?;
 
         let mut signal = FixedLengthSignal::<24>::new();
         for i in 0..24 {
@@ -29,6 +29,7 @@ impl<'a> LedDriver for TxRmtDriver<'a> {
     }
 }
 
+#[allow(dead_code)]
 pub fn hue_to_color(hue: u8) -> RGB8 {
     let value = ((hue as u16 * 6) % 256) as u8;
     let sector = (hue as u16 * 6) / 256;
