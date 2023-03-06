@@ -19,6 +19,9 @@ pio = ["esp-idf-sys/pio"]
 anyhow = "1.0"
 esp-idf-sys = { version = "0.32.1", features = ["binstart"] }
 esp-idf-hal = "0.40.1"
+esp-idf-svc = {version = "0.45.0", features = ["experimental"]}
+embedded-svc = {version = "0.24", features = ["experimental"]}
+embedded-hal = "0.2.7"
 rgb = "0.8.36"
 
 

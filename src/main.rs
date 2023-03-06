@@ -1,11 +1,14 @@
-use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
+//! A simple STD binary for the development board [ESP32-C3-DevKit-RUST](https://github.com/esp-rs/esp-rust-board).
 
+mod led;
+mod wifi;
+
+use crate::led::LedDriver;
+use crate::wifi::connect_wifi;
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_hal::rmt::config::TransmitConfig;
 use esp_idf_hal::rmt::TxRmtDriver;
-
-mod led;
-use crate::led::LedDriver;
+use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 
 fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -16,6 +19,8 @@ fn main() -> anyhow::Result<()> {
     let peripherals = Peripherals::take().unwrap();
     let config = TransmitConfig::new().clock_divider(1);
     let mut led = TxRmtDriver::new(peripherals.rmt.channel0, peripherals.pins.gpio2, &config)?;
+
+    let _wifi = connect_wifi(peripherals.modem)?;
 
     let mut hue = 0_u8;
     loop {

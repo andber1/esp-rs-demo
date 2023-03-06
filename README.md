@@ -5,6 +5,8 @@ A simple STD binary for the development board [ESP32-C3-DevKit-RUST](https://git
 ## Getting Started
 
 ```
+export ESP32_DEMO_WIFI_SSID=<ssid>
+export ESP32_DEMO_WIFI_PASS=<password>
 cargo espflash flash --release --baud 921600 --monitor 
 ```
 
