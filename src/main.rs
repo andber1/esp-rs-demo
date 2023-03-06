@@ -72,7 +72,7 @@ fn main() -> anyhow::Result<()> {
         std::result::Result::Ok(())
     })?;
 
-    led.set_color(RGB8::new(0_u8, 1_u8, 0_u8))?;
+    led.set_color(RGB8::new(0_u8, 10_u8, 0_u8))?;
     loop {
         // start one measurement
         let measurement = temperature_sensor

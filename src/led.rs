@@ -10,7 +10,9 @@ pub trait LedDriver {
 
 impl<'a> LedDriver for TxRmtDriver<'a> {
     fn set_color(&mut self, color: RGB8) -> anyhow::Result<()> {
-        let rgb: u32 = ((color.b as u32) << 16) + ((color.r as u32) << 8) + (color.g as u32);
+        let rgb: u32 = ((color.b.reverse_bits() as u32) << 16)
+            + ((color.r.reverse_bits() as u32) << 8)
+            + (color.g.reverse_bits() as u32);
 
         let ticks_hz = self.counter_clock()?;
         let t0h = Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(350))?;
