@@ -1,6 +1,7 @@
 //! A simple STD binary for the development board [ESP32-C3-DevKit-RUST](https://github.com/esp-rs/esp-rust-board).
 
 mod led;
+mod plot;
 mod wifi;
 
 use std::sync::{Arc, Mutex};
@@ -16,12 +17,14 @@ use esp_idf_hal::{
     units::KiloHertz,
 };
 use esp_idf_svc::http::server::{Configuration, EspHttpServer};
+use esp_idf_svc::sntp::{EspSntp, SyncStatus};
+use esp_idf_svc::systime::EspSystemTime;
 use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 
 use esp_idf_hal::delay::FreeRtos;
 use led::LedDriver;
 use rgb::RGB8;
-use ringbuffer::{AllocRingBuffer, RingBufferExt, RingBufferWrite};
+use ringbuffer::{AllocRingBuffer, RingBufferWrite};
 
 fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -36,6 +39,9 @@ fn main() -> anyhow::Result<()> {
     // connect wo wifi
     let _wifi = connect_wifi(peripherals.modem)?;
 
+    // sync time
+    let sntp = EspSntp::new_default()?;
+
     // create temperature sensor
     let mut temperature_sensor = shtcx::shtc3(I2cDriver::new(
         peripherals.i2c0,
@@ -45,8 +51,9 @@ fn main() -> anyhow::Result<()> {
     )?);
 
     // create buffer for sensor data
-    let buffer = Arc::new(Mutex::new(AllocRingBuffer::with_capacity(512)));
-    let buffer2 = buffer.clone();
+    const BUFFER_SIZE: usize = 512;
+    let buffer_temp = Arc::new(Mutex::new(AllocRingBuffer::with_capacity(BUFFER_SIZE)));
+    let buffer_humidity = Arc::new(Mutex::new(AllocRingBuffer::with_capacity(BUFFER_SIZE)));
 
     // start webserver to plot data
     let server_config = Configuration {
@@ -54,34 +61,35 @@ fn main() -> anyhow::Result<()> {
         ..Default::default()
     };
     let mut server = EspHttpServer::new(&server_config)?;
+    let buffer_temp2 = buffer_temp.clone();
+    let buffer_humidity2 = buffer_humidity.clone();
     server.fn_handler("/", Method::Get, move |req| {
-        let data: Vec<_> = buffer2
-            .lock()
-            .unwrap()
-            .iter()
-            .enumerate()
-            .map(|(index, value)| [index as f64, *value as f64])
-            .collect();
-        let a = poloto::build::plot("temperature").line(data);
-        let plot = poloto::data(a)
-            .build_and_label(("Temperature", "x", "y"))
-            .append_to(poloto::header().light_theme())
-            .render_string()?;
-
-        req.into_ok_response()?.write_all(plot.as_bytes())?;
+        let svg_plot = plot::create_svg_plot(
+            &buffer_temp2.lock().unwrap(),
+            &buffer_humidity2.lock().unwrap(),
+        )?;
+        req.into_ok_response()?.write_all(svg_plot.as_bytes())?;
         std::result::Result::Ok(())
     })?;
 
     led.set_color(RGB8::new(0_u8, 10_u8, 0_u8))?;
     loop {
+        if sntp.get_sync_status() == SyncStatus::InProgress {
+            continue;
+        }
         // start one measurement
+        let now = poloto::num::timestamp::UnixTime(EspSystemTime.now().as_secs() as i64);
         let measurement = temperature_sensor
             .measure(shtcx::PowerMode::NormalMode, &mut FreeRtos)
             .expect("SHTC3 measurement failure");
-        buffer
+        buffer_temp
             .lock()
             .unwrap()
-            .push(measurement.temperature.as_degrees_celsius());
+            .push((now, measurement.temperature.as_degrees_celsius() as f64));
+        buffer_humidity
+            .lock()
+            .unwrap()
+            .push((now, measurement.humidity.as_percent() as f64));
 
         FreeRtos::delay_ms(2000);
     }
