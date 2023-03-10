@@ -35,9 +35,10 @@ fn main() -> anyhow::Result<()> {
     let peripherals = Peripherals::take().unwrap();
     let config = TransmitConfig::new().clock_divider(1);
     let mut led = TxRmtDriver::new(peripherals.rmt.channel0, peripherals.pins.gpio2, &config)?;
+    led.set_color(RGB8::new(10_u8, 0_u8, 0_u8))?;
 
     // connect wo wifi
-    let _wifi = connect_wifi(peripherals.modem)?;
+    let mut wifi = connect_wifi(peripherals.modem)?;
 
     // sync time
     let sntp = EspSntp::new_default()?;
@@ -51,9 +52,8 @@ fn main() -> anyhow::Result<()> {
     )?);
 
     // create buffer for sensor data
-    const BUFFER_SIZE: usize = 512;
-    let buffer_temp = Arc::new(Mutex::new(AllocRingBuffer::with_capacity(BUFFER_SIZE)));
-    let buffer_humidity = Arc::new(Mutex::new(AllocRingBuffer::with_capacity(BUFFER_SIZE)));
+    const BUFFER_SIZE: usize = 2048;
+    let buffer = Arc::new(Mutex::new(AllocRingBuffer::with_capacity(BUFFER_SIZE)));
 
     // start webserver to plot data
     let server_config = Configuration {
@@ -61,36 +61,49 @@ fn main() -> anyhow::Result<()> {
         ..Default::default()
     };
     let mut server = EspHttpServer::new(&server_config)?;
-    let buffer_temp2 = buffer_temp.clone();
-    let buffer_humidity2 = buffer_humidity.clone();
-    server.fn_handler("/", Method::Get, move |req| {
-        let svg_plot = plot::create_svg_plot(
-            &buffer_temp2.lock().unwrap(),
-            &buffer_humidity2.lock().unwrap(),
-        )?;
-        req.into_ok_response()?.write_all(svg_plot.as_bytes())?;
+    const HTML_HEADER: &str = r#"<html><head><meta charset="UTF-8"></head><body>"#;
+    const HTML_FOOTER: &str = r#"</body></html>"#;
+    let buffer2 = buffer.clone();
+    server.fn_handler("/temperature", Method::Get, move |req| {
+        let mut res = req.into_ok_response()?;
+        let svg_plot = plot::create_svg_plot(&buffer2.lock().unwrap(), 0, "Temperature")?;
+        res.write_all(HTML_HEADER.as_bytes())?;
+        res.write_all(svg_plot.as_bytes())?;
+        res.write_all(HTML_FOOTER.as_bytes())?;
+        std::result::Result::Ok(())
+    })?;
+    let buffer3 = buffer.clone();
+    server.fn_handler("/humidity", Method::Get, move |req| {
+        let mut res = req.into_ok_response()?;
+        let svg_plot = plot::create_svg_plot(&buffer3.lock().unwrap(), 1, "Humidity")?;
+        res.write_all(HTML_HEADER.as_bytes())?;
+        res.write_all(svg_plot.as_bytes())?;
+        res.write_all(HTML_FOOTER.as_bytes())?;
         std::result::Result::Ok(())
     })?;
 
+    while sntp.get_sync_status() != SyncStatus::Completed {
+        FreeRtos::delay_ms(100);
+    }
     led.set_color(RGB8::new(0_u8, 10_u8, 0_u8))?;
     loop {
-        if sntp.get_sync_status() == SyncStatus::InProgress {
-            continue;
-        }
         // start one measurement
         let now = poloto::num::timestamp::UnixTime(EspSystemTime.now().as_secs() as i64);
         let measurement = temperature_sensor
             .measure(shtcx::PowerMode::NormalMode, &mut FreeRtos)
             .expect("SHTC3 measurement failure");
-        buffer_temp
-            .lock()
-            .unwrap()
-            .push((now, measurement.temperature.as_degrees_celsius() as f64));
-        buffer_humidity
-            .lock()
-            .unwrap()
-            .push((now, measurement.humidity.as_percent() as f64));
+        buffer.lock().unwrap().push((
+            now,
+            [
+                measurement.temperature.as_degrees_celsius(),
+                measurement.humidity.as_percent(),
+            ],
+        ));
 
+        if let Ok(false) = wifi.is_up() {
+            println!("Lost wifi connection, try to connect again...");
+            wifi.connect()?;
+        }
         FreeRtos::delay_ms(2000);
     }
 }
