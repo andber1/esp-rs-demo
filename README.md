@@ -15,7 +15,7 @@ A simple STD binary for the development board [ESP32-C3-DevKit-RUST](https://git
 ```
 export ESP32_DEMO_WIFI_SSID=<ssid>
 export ESP32_DEMO_WIFI_PASS=<password>
-cargo espflash flash --release --baud 921600 --monitor 
+cargo espflash flash --release --target riscv32imc-esp-espidf --baud 921600 --monitor 
 ```
 
 After flashing the ESP32 will provide a webserver that generates plots of the measured temperature and humidity. Open `<ip>/temperature` or `<ip>/humidity` in your webbrowser.
@@ -23,12 +23,13 @@ After flashing the ESP32 will provide a webserver that generates plots of the me
 ## Prerequisites
 
 ```
-sudo apt install -y pkg-config libudev-dev clang
+sudo apt install -y pkg-config libudev-dev clang python3-virtualenv
 rustup install nightly
 rustup component add rust-src --toolchain nightly
 cargo install ldproxy
 cargo install cargo-espflash
 ```
+see also: https://github.com/esp-rs/esp-idf-template#prerequisites
 
 # Further Reading
 - https://github.com/ivmarkov/rust-esp32-std-demo

@@ -6,9 +6,6 @@ mod wifi;
 
 use std::sync::{Arc, Mutex};
 
-use crate::wifi::connect_wifi;
-use embedded_svc::http::Method;
-use embedded_svc::io::Write;
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_hal::rmt::config::TransmitConfig;
 use esp_idf_hal::rmt::TxRmtDriver;
@@ -17,6 +14,8 @@ use esp_idf_hal::{
     units::KiloHertz,
 };
 use esp_idf_svc::http::server::{Configuration, EspHttpServer};
+use esp_idf_svc::http::Method;
+use esp_idf_svc::io::Write;
 use esp_idf_svc::sntp::{EspSntp, SyncStatus};
 use esp_idf_svc::systime::EspSystemTime;
 use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
@@ -24,7 +23,7 @@ use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, alway
 use esp_idf_hal::delay::FreeRtos;
 use led::LedDriver;
 use rgb::RGB8;
-use ringbuffer::{AllocRingBuffer, RingBufferWrite};
+use ringbuffer::{AllocRingBuffer, RingBuffer};
 
 fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
@@ -37,8 +36,8 @@ fn main() -> anyhow::Result<()> {
     let mut led = TxRmtDriver::new(peripherals.rmt.channel0, peripherals.pins.gpio2, &config)?;
     led.set_color(RGB8::new(10_u8, 0_u8, 0_u8))?;
 
-    // connect wo wifi
-    let mut wifi = connect_wifi(peripherals.modem)?;
+    // connect to wifi
+    let mut wifi = wifi::connect(peripherals.modem)?;
 
     // sync time
     let sntp = EspSntp::new_default()?;
@@ -53,7 +52,7 @@ fn main() -> anyhow::Result<()> {
 
     // create buffer for sensor data
     const BUFFER_SIZE: usize = 2048;
-    let buffer = Arc::new(Mutex::new(AllocRingBuffer::with_capacity(BUFFER_SIZE)));
+    let buffer = Arc::new(Mutex::new(AllocRingBuffer::new(BUFFER_SIZE)));
 
     // start webserver to plot data
     let server_config = Configuration {
@@ -66,29 +65,42 @@ fn main() -> anyhow::Result<()> {
     let buffer2 = buffer.clone();
     server.fn_handler("/temperature", Method::Get, move |req| {
         let mut res = req.into_ok_response()?;
-        let svg_plot = plot::create_svg_plot(&buffer2.lock().unwrap(), 0, "Temperature")?;
         res.write_all(HTML_HEADER.as_bytes())?;
-        res.write_all(svg_plot.as_bytes())?;
-        res.write_all(HTML_FOOTER.as_bytes())?;
-        std::result::Result::Ok(())
+        match plot::create_svg_plot(&buffer2.lock().unwrap(), 0, "Temperature") {
+            Ok(svg_plot) => {
+                res.write_all(svg_plot.as_bytes())?;
+            }
+            Err(err) => {
+                res.write_all(b"Error creating svg plot: ")?;
+                res.write_all(err.to_string().as_bytes())?;
+            }
+        }
+        res.write_all(HTML_FOOTER.as_bytes())
     })?;
     let buffer3 = buffer.clone();
     server.fn_handler("/humidity", Method::Get, move |req| {
         let mut res = req.into_ok_response()?;
-        let svg_plot = plot::create_svg_plot(&buffer3.lock().unwrap(), 1, "Humidity")?;
         res.write_all(HTML_HEADER.as_bytes())?;
-        res.write_all(svg_plot.as_bytes())?;
-        res.write_all(HTML_FOOTER.as_bytes())?;
-        std::result::Result::Ok(())
+        match plot::create_svg_plot(&buffer3.lock().unwrap(), 1, "Humidity") {
+            Ok(svg_plot) => {
+                res.write_all(svg_plot.as_bytes())?;
+            }
+            Err(err) => {
+                res.write_all(b"Error creating svg plot: ")?;
+                res.write_all(err.to_string().as_bytes())?;
+            }
+        }
+        res.write_all(HTML_FOOTER.as_bytes())
     })?;
 
     while sntp.get_sync_status() != SyncStatus::Completed {
         FreeRtos::delay_ms(100);
     }
     led.set_color(RGB8::new(0_u8, 10_u8, 0_u8))?;
+    println!("Start measurement loop");
     loop {
         // start one measurement
-        let now = poloto::num::timestamp::UnixTime(EspSystemTime.now().as_secs() as i64);
+        let now = poloto_chrono::UnixTime(EspSystemTime.now().as_secs() as i64);
         let measurement = temperature_sensor
             .measure(shtcx::PowerMode::NormalMode, &mut FreeRtos)
             .expect("SHTC3 measurement failure");

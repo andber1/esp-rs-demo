@@ -1,55 +1,38 @@
 //! Connects to a WiFi. The environment variables ESP32_DEMO_WIFI_SSID and ESP32_DEMO_WIFI_PASS are needed.
 
-use anyhow::bail;
-use core::time::Duration;
-use embedded_svc::wifi::{ClientConfiguration, Configuration, Wifi};
 use esp_idf_hal::modem::Modem;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
-use esp_idf_svc::netif::{EspNetif, EspNetifWait};
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
-use esp_idf_svc::wifi::{EspWifi, WifiWait};
-use std::net::Ipv4Addr;
+use esp_idf_svc::wifi::{BlockingWifi, ClientConfiguration, Configuration, EspWifi};
 
-pub fn connect_wifi(modem: Modem) -> anyhow::Result<EspWifi<'static>> {
+pub fn connect(modem: Modem) -> anyhow::Result<BlockingWifi<EspWifi<'static>>> {
     let sysloop = EspSystemEventLoop::take()?;
-    let mut wifi = EspWifi::new(
-        modem,
-        sysloop.clone(),
-        Some(EspDefaultNvsPartition::take()?),
+    let mut wifi = BlockingWifi::wrap(
+        EspWifi::new(
+            modem,
+            sysloop.clone(),
+            Some(EspDefaultNvsPartition::take()?),
+        )?,
+        sysloop,
     )?;
 
     wifi.set_configuration(&Configuration::Client(ClientConfiguration {
-        ssid: env!("ESP32_DEMO_WIFI_SSID").into(),
-        password: env!("ESP32_DEMO_WIFI_PASS").into(),
+        ssid: env!("ESP32_DEMO_WIFI_SSID").try_into().unwrap(),
+        password: env!("ESP32_DEMO_WIFI_PASS").try_into().unwrap(),
         ..Default::default()
     }))?;
 
+    println!("Starting Wifi...");
     wifi.start()?;
-
-    println!("Starting wifi...");
-
-    if !WifiWait::new(&sysloop)?
-        .wait_with_timeout(Duration::from_secs(20), || wifi.is_started().unwrap())
-    {
-        bail!("Wifi did not start");
-    }
-
-    println!("Connecting wifi...");
+    println!("Wifi started");
 
     wifi.connect()?;
+    println!("Wifi connected");
 
-    if !EspNetifWait::new::<EspNetif>(wifi.sta_netif(), &sysloop)?.wait_with_timeout(
-        Duration::from_secs(20),
-        || {
-            wifi.is_connected().unwrap()
-                && wifi.sta_netif().get_ip_info().unwrap().ip != Ipv4Addr::new(0, 0, 0, 0)
-        },
-    ) {
-        bail!("Wifi did not connect or did not receive a DHCP lease");
-    }
+    wifi.wait_netif_up()?;
+    println!("Wifi netif up");
 
-    let ip_info = wifi.sta_netif().get_ip_info()?;
-
+    let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
     println!("Wifi DHCP info: {:?}", ip_info);
 
     Ok(wifi)
