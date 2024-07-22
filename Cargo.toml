@@ -18,15 +18,15 @@ pio = ["esp-idf-sys/pio"]
 
 [dependencies]
 anyhow = "1.0"
-esp-idf-sys = { version = "0.34", features = ["binstart"] }
-esp-idf-hal = "0.43"
-esp-idf-svc = {version = "0.48"}
+esp-idf-sys = { version = "0.35.0", features = ["binstart"] }
+esp-idf-hal = "0.44.1"
+esp-idf-svc = {version = "0.49.1"}
 rgb = "0.8.36"
-shtcx = "0.11.0"
+shtcx = "1.0"
 poloto = "19.1.2"
 poloto-chrono = "0.4.0"
 ringbuffer = "0.15.0"
 
 
 [build-dependencies]
-embuild = "0.31.0"
+embuild = "0.32.0"
