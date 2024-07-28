@@ -1,7 +1,7 @@
 //! Driver for a RGB WS2812 LED
 
 use core::time::Duration;
-use esp_idf_hal::rmt::*;
+use esp_idf_svc::hal::rmt::*;
 use rgb::RGB8;
 
 pub trait LedDriver {

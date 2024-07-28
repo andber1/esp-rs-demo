@@ -6,10 +6,11 @@ mod wifi;
 
 use std::sync::{Arc, Mutex};
 
-use esp_idf_hal::peripherals::Peripherals;
-use esp_idf_hal::rmt::config::TransmitConfig;
-use esp_idf_hal::rmt::TxRmtDriver;
-use esp_idf_hal::{
+use esp_idf_svc::hal::delay::FreeRtos;
+use esp_idf_svc::hal::peripherals::Peripherals;
+use esp_idf_svc::hal::rmt::config::TransmitConfig;
+use esp_idf_svc::hal::rmt::TxRmtDriver;
+use esp_idf_svc::hal::{
     i2c::{config::Config, I2cDriver},
     units::KiloHertz,
 };
@@ -18,9 +19,7 @@ use esp_idf_svc::http::Method;
 use esp_idf_svc::io::Write;
 use esp_idf_svc::sntp::{EspSntp, SyncStatus};
 use esp_idf_svc::systime::EspSystemTime;
-use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
 
-use esp_idf_hal::delay::FreeRtos;
 use led::LedDriver;
 use rgb::RGB8;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
@@ -28,7 +27,10 @@ use ringbuffer::{AllocRingBuffer, RingBuffer};
 fn main() -> anyhow::Result<()> {
     // It is necessary to call this function once. Otherwise some patches to the runtime
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
-    esp_idf_sys::link_patches();
+    esp_idf_svc::sys::link_patches();
+
+    // Bind the log crate to the ESP Logging facilities
+    esp_idf_svc::log::EspLogger::initialize_default();
 
     // setup RGB LED
     let peripherals = Peripherals::take().unwrap();
@@ -97,7 +99,7 @@ fn main() -> anyhow::Result<()> {
         FreeRtos::delay_ms(100);
     }
     led.set_color(RGB8::new(0_u8, 10_u8, 0_u8))?;
-    println!("Start measurement loop");
+    log::info!("Start measurement loop");
     loop {
         // start one measurement
         let now = poloto_chrono::UnixTime(EspSystemTime.now().as_secs() as i64);
@@ -113,7 +115,7 @@ fn main() -> anyhow::Result<()> {
         ));
 
         if let Ok(false) = wifi.is_up() {
-            println!("Lost wifi connection, try to connect again...");
+            log::warn!("Lost wifi connection, try to connect again...");
             wifi.connect()?;
         }
         FreeRtos::delay_ms(2000);
