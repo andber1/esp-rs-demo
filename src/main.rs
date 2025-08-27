@@ -6,10 +6,10 @@ mod wifi;
 
 use std::sync::{Arc, Mutex};
 
+use esp_idf_hal::rmt::TxRmtDriver;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::peripherals::Peripherals;
 use esp_idf_svc::hal::rmt::config::TransmitConfig;
-use esp_idf_svc::hal::rmt::TxRmtDriver;
 use esp_idf_svc::hal::{
     i2c::{config::Config, I2cDriver},
     units::KiloHertz,
@@ -106,7 +106,7 @@ fn main() -> anyhow::Result<()> {
         let measurement = temperature_sensor
             .measure(shtcx::PowerMode::NormalMode, &mut FreeRtos)
             .expect("SHTC3 measurement failure");
-        buffer.lock().unwrap().push((
+        buffer.lock().unwrap().enqueue((
             now,
             [
                 measurement.temperature.as_degrees_celsius(),

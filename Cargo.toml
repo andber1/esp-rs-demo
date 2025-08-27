@@ -1,6 +1,6 @@
 [package]
 name = "esp-rs-demo"
-version = "0.7.0"
+version = "0.7.1"
 authors = ["andber1"]
 edition = "2021"
 resolver = "2"
@@ -16,13 +16,14 @@ opt-level = "z"
 [dependencies]
 log = { version = "0.4", default-features = false }
 anyhow = "1.0"
-esp-idf-svc = {version = "0.49.1"}
+esp-idf-svc = {version = "0.51.0"}
+esp-idf-hal = {version = "0.45.2", features = ["rmt-legacy"]}
 rgb = "0.8.36"
 shtcx = "1.0"
 poloto = "19.1.2"
 poloto-chrono = "0.4.0"
-ringbuffer = "0.15.0"
+ringbuffer = "0.16.0"
 
 
 [build-dependencies]
-embuild = "0.32.0"
+embuild = "0.33.0"
