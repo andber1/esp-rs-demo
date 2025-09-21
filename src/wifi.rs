@@ -1,4 +1,4 @@
-//! Connects to a WiFi. The environment variables ESP32_DEMO_WIFI_SSID and ESP32_DEMO_WIFI_PASS are needed.
+//! Connects to a WiFi. The environment variables `ESP32_DEMO_WIFI_SSID` and `ESP32_DEMO_WIFI_PASS` are needed.
 
 use esp_idf_svc::eventloop::EspSystemEventLoop;
 use esp_idf_svc::hal::modem::Modem;
@@ -33,7 +33,7 @@ pub fn connect(modem: Modem) -> anyhow::Result<BlockingWifi<EspWifi<'static>>> {
     log::info!("Wifi netif up");
 
     let ip_info = wifi.wifi().sta_netif().get_ip_info()?;
-    log::info!("Wifi DHCP info: {:?}", ip_info);
+    log::info!("Wifi DHCP info: {ip_info:?}");
 
     Ok(wifi)
 }

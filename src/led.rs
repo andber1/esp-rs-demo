@@ -1,18 +1,18 @@
 //! Driver for a RGB WS2812 LED
 
 use core::time::Duration;
-use esp_idf_svc::hal::rmt::*;
+use esp_idf_svc::hal::rmt::{FixedLengthSignal, PinState, Pulse, TxRmtDriver};
 use rgb::RGB8;
 
 pub trait LedDriver {
     fn set_color(&mut self, color: RGB8) -> anyhow::Result<()>;
 }
 
-impl<'a> LedDriver for TxRmtDriver<'a> {
+impl LedDriver for TxRmtDriver<'_> {
     fn set_color(&mut self, color: RGB8) -> anyhow::Result<()> {
-        let rgb: u32 = ((color.b.reverse_bits() as u32) << 16)
-            + ((color.r.reverse_bits() as u32) << 8)
-            + (color.g.reverse_bits() as u32);
+        let rgb: u32 = (u32::from(color.b.reverse_bits()) << 16)
+            + (u32::from(color.r.reverse_bits()) << 8)
+            + u32::from(color.g.reverse_bits());
 
         let ticks_hz = self.counter_clock()?;
         let t0h = Pulse::new_with_duration(ticks_hz, PinState::High, &Duration::from_nanos(350))?;
@@ -33,8 +33,8 @@ impl<'a> LedDriver for TxRmtDriver<'a> {
 
 #[allow(dead_code)]
 pub fn hue_to_color(hue: u8) -> RGB8 {
-    let value = ((hue as u16 * 6) % 256) as u8;
-    let sector = (hue as u16 * 6) / 256;
+    let value = ((u16::from(hue) * 6) % 256) as u8;
+    let sector = (u16::from(hue) * 6) / 256;
     match sector {
         0 => RGB8::new(255, value, 0),
         1 => RGB8::new(255 - value, 255, 0),

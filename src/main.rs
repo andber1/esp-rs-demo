@@ -63,7 +63,7 @@ fn main() -> anyhow::Result<()> {
     };
     let mut server = EspHttpServer::new(&server_config)?;
     const HTML_HEADER: &str = r#"<html><head><meta charset="UTF-8"></head><body>"#;
-    const HTML_FOOTER: &str = r#"</body></html>"#;
+    const HTML_FOOTER: &str = r"</body></html>";
     let buffer2 = buffer.clone();
     server.fn_handler("/temperature", Method::Get, move |req| {
         let mut res = req.into_ok_response()?;

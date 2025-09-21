@@ -17,7 +17,10 @@ pub fn create_svg_plot(
         .with_tick_lines([true, true])
         .with_viewbox(svg.get_viewbox())
         .build();
-    let data: Vec<_> = buffer.iter().map(|x| (x.0, x.1[index] as f64)).collect();
+    let data: Vec<_> = buffer
+        .iter()
+        .map(|x| (x.0, f64::from(x.1[index])))
+        .collect();
     let plot = poloto::build::plot(legend).line(data);
     let svg_plot = render_frame
         .data(plot)
