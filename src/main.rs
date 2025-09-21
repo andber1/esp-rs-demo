@@ -6,6 +6,7 @@ mod wifi;
 
 use std::sync::{Arc, Mutex};
 
+use esp_idf_hal::gpio::PinDriver;
 use esp_idf_hal::rmt::TxRmtDriver;
 use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::peripherals::Peripherals;
@@ -35,8 +36,11 @@ fn main() -> anyhow::Result<()> {
     // setup RGB LED
     let peripherals = Peripherals::take().unwrap();
     let config = TransmitConfig::new().clock_divider(1);
-    let mut led = TxRmtDriver::new(peripherals.rmt.channel0, peripherals.pins.gpio2, &config)?;
-    led.set_color(RGB8::new(10_u8, 0_u8, 0_u8))?;
+    let mut led_rgb = TxRmtDriver::new(peripherals.rmt.channel0, peripherals.pins.gpio2, &config)?;
+    led_rgb.set_color(RGB8::new(10_u8, 0_u8, 0_u8))?;
+
+    // setup of red status LED
+    let mut led_red = PinDriver::output(peripherals.pins.gpio7)?;
 
     // connect to wifi
     let mut wifi = wifi::connect(peripherals.modem)?;
@@ -98,7 +102,7 @@ fn main() -> anyhow::Result<()> {
     while sntp.get_sync_status() != SyncStatus::Completed {
         FreeRtos::delay_ms(100);
     }
-    led.set_color(RGB8::new(0_u8, 10_u8, 0_u8))?;
+    led_rgb.set_color(RGB8::new(0_u8, 10_u8, 0_u8))?;
     log::info!("Start measurement loop");
     loop {
         // start one measurement
@@ -118,6 +122,7 @@ fn main() -> anyhow::Result<()> {
             log::warn!("Lost wifi connection, try to connect again...");
             wifi.connect()?;
         }
+        led_red.toggle()?;
         FreeRtos::delay_ms(2000);
     }
 }
